@@ -63,9 +63,7 @@ def load_data(file_path):
         st.stop()
     
     # 6. OPCIÓN A: Cargar directamente la columna nativa del CSV para evitar duplicidades
-    if 'TOTAL_ANIMALES_AFTOSA' in df.columns:
-        df['TOTAL_ANIMALES_AFTOSA'] = df['TOTAL_ANIMALES_AFTOSA'].astype(str).str.replace('.', '').str.replace(',', '.')
-        df['TOTAL_ANIMALES_AFTOSA'] = pd.to_numeric(df['TOTAL_ANIMALES_AFTOSA'], errors='coerce').fillna(0)
+    if 'TOTAL_ANIMALES_AFTOSA'
     else:
         st.error("No se encontró la columna oficial 'TOTAL_ANIMALES_AFTOSA' en el archivo CSV.")
         st.stop()
