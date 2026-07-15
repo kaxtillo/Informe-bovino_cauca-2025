@@ -133,6 +133,7 @@ if df is not None:
         st.header("Análisis de la Estructura del Hato Ganadero")
         st.subheader("1. Pirámide Poblacional Bovina (Edad y Sexo)")
         
+       # --- MAPEO DE COLUMNAS PARA LA PIRÁMIDE ---
         mapa_hembras = {
             'AFTOSA_BOVINOS_HEMBRAS_MENORES_A_3_MESES': '0-3 meses',
             'AFTOSA_BOVINOS_HEMBRAS_MENORES_DE_3_A_8_MESES': '3-8 meses',
@@ -147,4 +148,8 @@ if df is not None:
             'AFTOSA_BOVINOS_MACHOS_MENORES_A_3_MESES': '< 3 meses', 
             'AFTOSA_BOVINOS_MACHOS_3_HASTA_8_MESES': '3-8 meses',
             'AFTOSA_BOVINOS_MACHOS_8_HASTA_12_MESES': '8-12 meses',
-            'AFTOSA_BOVINOS_TER
+            'AFTOSA_BOVINOS_TERNEROS_MENORES_A_1_AÑ': 'Terneros < 1 año',
+            'AFTOSA_BOVINOS_MACHOS_1___2_AÑO': '1-2 años',
+            'AFTOSA_BOVINOS_MACHOS_2___3_AÑO': '2-3 años',
+            'AFTOSA_BOVINOS_MACHOS_MAYORES_A_3_AÑO': '> 3 años'
+        }
