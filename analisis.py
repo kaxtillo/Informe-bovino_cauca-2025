@@ -63,7 +63,7 @@ def load_data(file_path):
         st.stop()
     
     # 6. OPCIÓN A: Cargar directamente la columna nativa del CSV para evitar duplicidades
-    if 'TOTAL_ANIMALES_AFTOSA'
+    if 'TOTAL_ANIMALES_AFTOSA' in df.columns
     else:
         st.error("No se encontró la columna oficial 'TOTAL_ANIMALES_AFTOSA' en el archivo CSV.")
         st.stop()
