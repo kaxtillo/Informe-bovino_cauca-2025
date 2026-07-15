@@ -35,13 +35,18 @@ st.title("🐄 Observatorio de Vigilancia Vacunación - Cauca - 2025")
 st.markdown("Análisis de datos de vacunación bovina - Ciclo II 2025")
 
 # 2. CARGA DE DATOS (Con caché para velocidad)
-# 2. CARGA DE DATOS (Con caché para velocidad)
 @st.cache_data
 def load_data(file_path):
+    # Leer el archivo omitiendo filas vacías y eliminando líneas corruptas al final
     df = pd.read_csv(file_path, delimiter=';', encoding='latin1', skip_blank_lines=True)
-    df.columns = df.columns.str.strip()
-    df = df.dropna(subset=['MUNICIPIO', 'PREDIO'], how='all')
     
+    # Limpieza absoluta de nombres de columnas (elimina espacios y saltos de línea invisibles)
+    df.columns = df.columns.str.strip().str.replace('\r', '').str.replace('\n', '')
+    
+    # Eliminar filas del final del CSV que solo contienen puntos y comas (sin datos reales)
+    df = df.dropna(subset=['MUNICIPIO'], how='all')
+    
+    # Procesar LATITUD de forma segura
     if 'LATITUD' in df.columns:
         df['LATITUD'] = df['LATITUD'].astype(str).str.replace(',', '.').str.strip()
         df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
@@ -49,6 +54,7 @@ def load_data(file_path):
         st.error(f"La columna 'LATITUD' no se encontró. Columnas disponibles: {list(df.columns)}")
         st.stop()
         
+    # Procesar LONGITUD de forma segura
     if 'LONGITUD' in df.columns:
         df['LONGITUD'] = df['LONGITUD'].astype(str).str.replace(',', '.').str.strip()
         df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
@@ -56,6 +62,7 @@ def load_data(file_path):
         st.error(f"La columna 'LONGITUD' no se encontró. Columnas disponibles: {list(df.columns)}")
         st.stop()
     
+    # Identificar columnas de bovinos de forma segura
     cols_bovinos = [
         c for c in df.columns 
         if 'AFTOSA_BOVINOS' in c 
@@ -65,6 +72,7 @@ def load_data(file_path):
     df[cols_bovinos] = df[cols_bovinos].fillna(0)
     df['TOTAL_BOVINOS'] = df[cols_bovinos].sum(axis=1)
     
+    # Filtrar coordenadas válidas (distintas de cero y que no sean nulas)
     df = df.dropna(subset=['LATITUD', 'LONGITUD'])
     df = df[(df['LATITUD'] != 0) & (df['LONGITUD'] != 0)]
     
@@ -77,7 +85,7 @@ try:
     df = load_data(archivo_seleccionado)
 except Exception as e:
     st.error(f"Error cargando el archivo '{archivo_seleccionado}': {e}")
-    st.info("Por favor, verifica que el archivo esté subido correctamente a GitHub con el mismo nombre (respetando mayúsculas, minúsculas y tildes).")
+    st.info("Por favor, verifica que el archivo esté subido correctamente a GitHub con el mismo nombre.")
 
 # --- SOLO EJECUTAR SI EL DATAFRAME SE CARGÓ CORRECTAMENTE ---
 if df is not None:
@@ -249,7 +257,9 @@ if df is not None:
             st.plotly_chart(fig_error, use_container_width=True)
             
             with st.expander("Ver tabla de datos anómalos"):
-                st.dataframe(df_error[['MUNICIPIO', 'VEREDA', 'GANADERO', 'PREDIO']])
+                # Aquí verificamos dinámicamente si la columna es PREDIO o NOMBRE_PREDIO para que no falle
+                col_predio = 'PREDIO' if 'PREDIO' in df_error.columns else ('NOMBRE_PREDIO' if 'NOMBRE_PREDIO' in df_error.columns else df_error.columns[3])
+                st.dataframe(df_error[['MUNICIPIO', 'VEREDA', 'GANADERO', col_predio]])
         else:
             st.success("No se detectaron predios con 0 bovinos en los datos seleccionados.")
 
