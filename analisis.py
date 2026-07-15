@@ -35,13 +35,14 @@ st.title("🐄 Observatorio de Vigilancia Vacunación - Cauca - 2025")
 st.markdown("Análisis de datos de vacunación bovina - Ciclo II 2025")
 
 # 2. CARGA DE DATOS (Con caché para velocidad)
+# 2. CARGA DE DATOS (Con caché para velocidad)
 @st.cache_data
 def load_data(file_path):
-    # Intentamos leer con 'utf-8-sig' para eliminar el BOM (ï»¿) automáticamente
+    # Intentar leer con utf-8-sig (para limpiar el BOM ï»¿)
     try:
         df = pd.read_csv(file_path, delimiter=';', encoding='utf-8-sig', skip_blank_lines=True)
     except Exception:
-        # Fallback por si acaso
+        # Si falla utf-8-sig, intentamos con latin1
         df = pd.read_csv(file_path, delimiter=';', encoding='latin1', skip_blank_lines=True)
     
     # Limpieza absoluta de nombres de columnas (elimina espacios y saltos de línea invisibles)
@@ -84,3 +85,13 @@ def load_data(file_path):
     df = df[(df['LATITUD'] != 0) & (df['LONGITUD'] != 0)]
     
     return df
+
+# --- INICIALIZACIÓN SEGURA ---
+df = None
+
+try:
+    df = load_data(archivo_seleccionado)
+except Exception as e:
+    st.error(f"❌ Error crítico al procesar el archivo '{archivo_seleccionado}':")
+    st.exception(e)  # <-- Esto nos mostrará el detalle exacto del error en la web de Streamlit
+    st.info("Por favor, verifica que el archivo esté subido correctamente a GitHub con el mismo nombre.")
