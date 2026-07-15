@@ -37,13 +37,32 @@ st.markdown("Análisis de datos de vacunación bovina - Ciclo II 2025")
 # 2. CARGA DE DATOS (Con caché para velocidad)
 @st.cache_data
 def load_data(file_path):
-    df = pd.read_csv(file_path, delimiter=';', encoding='latin1')
+    # 1. Leer el archivo omitiendo filas que estén completamente vacías
+    df = pd.read_csv(file_path, delimiter=';', encoding='latin1', skip_blank_lines=True)
     
-    # Limpieza básica de coordenadas
-    df['LATITUD'] = df['LATITUD'].astype(str).str.replace(',', '.').astype(float)
-    df['LONGITUD'] = df['LONGITUD'].astype(str).str.replace(',', '.').astype(float)
+    # 2. Eliminar espacios en blanco alrededor de los nombres de las columnas
+    df.columns = df.columns.str.strip()
     
-    # Identificar columnas de bovinos de forma segura excluyendo años de control
+    # 3. Eliminar filas donde las columnas clave sean completamente nulas o tengan solo punto y coma
+    df = df.dropna(subset=['MUNICIPIO', 'PREDIO'], how='all')
+    
+    # 4. Procesar LATITUD de forma segura
+    if 'LATITUD' in df.columns:
+        df['LATITUD'] = df['LATITUD'].astype(str).str.replace(',', '.').str.strip()
+        df['LATITUD'] = pd.to_numeric(df['LATITUD'], errors='coerce')
+    else:
+        st.error(f"La columna 'LATITUD' no se encontró. Columnas disponibles: {list(df.columns)}")
+        st.stop()
+        
+    # 5. Procesar LONGITUD de forma segura
+    if 'LONGITUD' in df.columns:
+        df['LONGITUD'] = df['LONGITUD'].astype(str).str.replace(',', '.').str.strip()
+        df['LONGITUD'] = pd.to_numeric(df['LONGITUD'], errors='coerce')
+    else:
+        st.error(f"La columna 'LONGITUD' no se encontró. Columnas disponibles: {list(df.columns)}")
+        st.stop()
+    
+    # 6. Identificar columnas de bovinos de forma segura
     cols_bovinos = [
         c for c in df.columns 
         if 'AFTOSA_BOVINOS' in c 
@@ -53,17 +72,11 @@ def load_data(file_path):
     df[cols_bovinos] = df[cols_bovinos].fillna(0)
     df['TOTAL_BOVINOS'] = df[cols_bovinos].sum(axis=1)
     
-    # Filtrar coordenadas válidas
-    df = df[(df['LATITUD'] > 0) & (df['LONGITUD'] < 0)]
+    # 7. Filtrar coordenadas válidas (Latitud norte/ecuador y Longitud oeste)
+    df = df.dropna(subset=['LATITUD', 'LONGITUD'])
+    df = df[(df['LATITUD'] != 0) & (df['LONGITUD'] != 0)]
     
     return df
-
-try:
-    df = load_data(archivo_seleccionado)
-except Exception as e:
-    st.error(f"Error cargando el archivo '{archivo_seleccionado}': {e}")
-    st.info("Asegúrate de que el archivo CSV esté en la misma carpeta que este script de Python.")
-    st.stop()
 
 # 3. BARRA LATERAL (FILTROS)
 st.sidebar.header("Filtros de Visualización")
