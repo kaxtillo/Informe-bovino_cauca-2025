@@ -5,36 +5,17 @@ import plotly.graph_objects as go
 from streamlit_folium import st_folium
 import folium
 from folium.plugins import HeatMap
-import os
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="Observatorio Epidemiológico Cauca", layout="wide", page_icon="🐄")
 
-# --- Configuración de Datos ---
-st.sidebar.header("Configuración de Datos")
-
-# Nombre del archivo fijo o dinámico si existen más
-archivo_predeterminado = 'Ruv Total Cauca II 2025.csv'
-archivos_disponibles = [f for f in os.listdir('.') if f.endswith('.csv')]
-
-if archivo_predeterminado in archivos_disponibles:
-    archivo_seleccionado = st.sidebar.selectbox(
-        "Seleccione el archivo de datos:",
-        options=archivos_disponibles,
-        index=archivos_disponibles.index(archivo_predeterminado)
-    )
-else:
-    archivo_seleccionado = st.sidebar.selectbox(
-        "Seleccione el archivo de datos:",
-        options=archivos_disponibles if archivos_disponibles else [archivo_predeterminado],
-        index=0
-    )
-
-# Título dinámico
+# Título de la Aplicación
 st.title("🐄 Observatorio de Vigilancia Vacunación - Cauca - 2025")
 st.markdown("Análisis de datos de vacunación bovina - Ciclo II 2025")
 
-# 2. CARGA DE DATOS (Con caché para velocidad)
+# Nombre fijo del archivo para evitar selectores innecesarios
+archivo_datos = 'Ruv Total Cauca II 2025.csv'
+
 # 2. CARGA DE DATOS (Con caché para velocidad)
 @st.cache_data
 def load_data(file_path):
@@ -90,8 +71,80 @@ def load_data(file_path):
 df = None
 
 try:
-    df = load_data(archivo_seleccionado)
+    df = load_data(archivo_datos)
 except Exception as e:
-    st.error(f"❌ Error crítico al procesar el archivo '{archivo_seleccionado}':")
-    st.exception(e)  # <-- Esto nos mostrará el detalle exacto del error en la web de Streamlit
+    st.error(f"❌ Error crítico al procesar el archivo '{archivo_datos}':")
+    st.exception(e)
     st.info("Por favor, verifica que el archivo esté subido correctamente a GitHub con el mismo nombre.")
+
+# --- SOLO EJECUTAR SI EL DATAFRAME SE CARGÓ CORRECTAMENTE ---
+if df is not None:
+
+    # 3. BARRA LATERAL (ÚNICAMENTE FILTRO DE MUNICIPIOS)
+    st.sidebar.header("Filtros de Análisis")
+    municipios_disponibles = sorted(df['MUNICIPIO'].dropna().unique())
+    municipio_filter = st.sidebar.multiselect(
+        "Seleccionar Municipio(s):",
+        options=municipios_disponibles,
+        default=municipios_disponibles[:3] if len(municipios_disponibles) >= 3 else municipios_disponibles,
+        help="Selecciona uno o varios municipios para filtrar todos los datos del observatorio."
+    )
+
+    # Aplicar filtro
+    if municipio_filter:
+        df_filtered = df[df['MUNICIPIO'].isin(municipio_filter)]
+    else:
+        df_filtered = df
+
+    # 4. KPIs (INDICADORES CLAVE)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Predios Filtrados", f"{len(df_filtered):,}")
+    col2.metric("Población Bovina", f"{int(df_filtered['TOTAL_BOVINOS'].sum()):,}")
+    promedio = df_filtered['TOTAL_BOVINOS'].mean() if len(df_filtered) > 0 else 0
+    col3.metric("Promedio Animales/Predio", f"{promedio:.1f}")
+
+    # 5. PESTAÑAS DE ANÁLISIS
+    tab1, tab2, tab3 = st.tabs(["🗺️ Mapas Interactivos", "📊 Demografía y Vocación", "🚨 Detección de Anomalías"])
+
+    with tab1:
+        st.header("Distribución Geoespacial")
+        if not df_filtered.empty:
+            col_map1, col_map2 = st.columns(2)
+            
+            with col_map1:
+                st.subheader("Mapa de Calor (Densidad)")
+                m = folium.Map(location=[df_filtered['LATITUD'].mean(), df_filtered['LONGITUD'].mean()], zoom_start=9)
+                heat_data = df_filtered[['LATITUD', 'LONGITUD']].values.tolist()
+                HeatMap(heat_data, radius=10).add_to(m)
+                st_folium(m, height=500, use_container_width=True)
+                
+            with col_map2:
+                st.subheader("Distribución por Tamaño del Hato")
+                fig_scatter = px.scatter_map(
+                    df_filtered, lat="LATITUD", lon="LONGITUD", color="MUNICIPIO", size="TOTAL_BOVINOS",
+                    zoom=8, height=500
+                )
+                fig_scatter.update_layout(map_style="open-street-map")
+                st.plotly_chart(fig_scatter, use_container_width=True)
+        else:
+            st.warning("No hay datos geográficos para mostrar con los filtros actuales.")
+
+    with tab2:
+        st.header("Análisis de la Estructura del Hato Ganadero")
+        st.subheader("1. Pirámide Poblacional Bovina (Edad y Sexo)")
+        
+        mapa_hembras = {
+            'AFTOSA_BOVINOS_HEMBRAS_MENORES_A_3_MESES': '0-3 meses',
+            'AFTOSA_BOVINOS_HEMBRAS_MENORES_DE_3_A_8_MESES': '3-8 meses',
+            'AFTOSA_BOVINOS_DE_8_A_12_MESES': '8-12 meses',
+            'AFTOSA_BOVINOS_HEMBRAS_1___2_AÑO': '1-2 años',
+            'AFTOSA_BOVINOS_HEMBRAS_2___3_AÑO': '2-3 años',
+            'AFTOSA_BOVINOS_HEMBRAS_3___5_AÑO': '3-5 años',
+            'AFTOSA_BOVINOS_HEMBRAS_MAYORES_A_5_AÑO': '> 5 años'
+        }
+
+        mapa_machos = {
+            'AFTOSA_BOVINOS_MACHOS_MENORES_A_3_MESES': '< 3 meses', 
+            'AFTOSA_BOVINOS_MACHOS_3_HASTA_8_MESES': '3-8 meses',
+            'AFTOSA_BOVINOS_MACHOS_8_HASTA_12_MESES': '8-12 meses',
+            'AFTOSA_BOVINOS_TER
