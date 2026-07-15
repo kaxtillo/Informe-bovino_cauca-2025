@@ -73,7 +73,7 @@ def load_data(file_path):
     ]
     df[cols_bovinos] = df[cols_bovinos].fillna(0)
     
-    # Reemplazo de la variable calculada en todo el flujo de datos
+    # Asignación de la variable calculada uniforme
     df['TOTAL_ANIMALES_AFTOSA'] = df[cols_bovinos].sum(axis=1)
     
     # Filtrar coordenadas válidas
@@ -133,33 +133,33 @@ if df is not None:
                 HeatMap(heat_data, radius=10).add_to(m)
                 st_folium(m, height=500, use_container_width=True)
                 
-   with col_map2:
-    st.subheader("Distribución por Tamaño del Hato")
-    
-    # Identificar dinámicamente el nombre de la columna de predio
-    col_predio = 'PREDIO' if 'PREDIO' in df_filtered.columns else ('NOMBRE_PREDIO' if 'NOMBRE_PREDIO' in df_filtered.columns else df_filtered.columns[3])
-    
-    # Configurar el mapa de dispersión para mostrar el predio en el hover
-    fig_scatter = px.scatter_map(
-        df_filtered, 
-        lat="LATITUD", 
-        lon="LONGITUD", 
-        color="MUNICIPIO", 
-        size="TOTAL_ANIMALES_AFTOSA",
-        hover_name=col_predio,  # <-- Muestra el nombre del predio en negrita al pasar el mouse
-        hover_data={
-            "MUNICIPIO": True,
-            "VEREDA": True,
-            "GANADERO": True,
-            "TOTAL_ANIMALES_AFTOSA": ":,.0f",  # Muestra el total formateado con miles
-            "LATITUD": False,                  # Ocultamos coordenadas para evitar ruido visual
-            "LONGITUD": False
-        },
-        zoom=8, 
-        height=500
-    )
-    fig_scatter.update_layout(map_style="open-street-map")
-    st.plotly_chart(fig_scatter, use_container_width=True)
+            with col_map2:
+                st.subheader("Distribución por Tamaño del Hato")
+                
+                # Identificar dinámicamente el nombre de la columna de predio
+                col_predio = 'PREDIO' if 'PREDIO' in df_filtered.columns else ('NOMBRE_PREDIO' if 'NOMBRE_PREDIO' in df_filtered.columns else df_filtered.columns[3])
+                
+                # Configurar el mapa de dispersión para mostrar el predio en el hover
+                fig_scatter = px.scatter_map(
+                    df_filtered, 
+                    lat="LATITUD", 
+                    lon="LONGITUD", 
+                    color="MUNICIPIO", 
+                    size="TOTAL_ANIMALES_AFTOSA",
+                    hover_name=col_predio,  # Muestra el nombre del predio al pasar el mouse
+                    hover_data={
+                        "MUNICIPIO": True,
+                        "VEREDA": True,
+                        "GANADERO": True,
+                        "TOTAL_ANIMALES_AFTOSA": ":,.0f",  # Formatea con separador de miles
+                        "LATITUD": False,
+                        "LONGITUD": False
+                    },
+                    zoom=8, 
+                    height=500
+                )
+                fig_scatter.update_layout(map_style="open-street-map")
+                st.plotly_chart(fig_scatter, use_container_width=True)
         else:
             st.warning("No hay datos geográficos para mostrar con los filtros actuales.")
 
@@ -167,7 +167,7 @@ if df is not None:
         st.header("Análisis de la Estructura del Hato Ganadero")
         st.subheader("1. Pirámide Poblacional Bovina (Edad y Sexo)")
         
-        # Mapeos de columnas
+        # Mapeos de columnas unificando etiquetas a los 7 rangos
         mapa_hembras = {
             'AFTOSA_BOVINOS_HEMBRAS_MENORES_A_3_MESES': '0-3 meses',
             'AFTOSA_BOVINOS_HEMBRAS_MENORES_DE_3_A_8_MESES': '3-8 meses',
@@ -188,6 +188,7 @@ if df is not None:
             'AFTOSA_BOVINOS_MACHOS_MAYORES_A_3_AÑO': '3-5 años'
         }
 
+        # El orden estricto solicitado
         orden_estricto = [
             '0-3 meses',
             '3-8 meses',
@@ -274,7 +275,6 @@ if df is not None:
         st.subheader("2. Distribución de Población Bovina por Municipio")
         
         if not df_filtered.empty:
-            # TOTAL_ANIMALES_AFTOSA define el total por municipio en la gráfica de barras
             top_munis = df_filtered.groupby('MUNICIPIO')['TOTAL_ANIMALES_AFTOSA'].sum().sort_values(ascending=False).reset_index(name='Población Bovina') 
             fig_bar = px.bar(
                 top_munis, x='Población Bovina', y='MUNICIPIO', orientation='h', 
