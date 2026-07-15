@@ -62,19 +62,24 @@ def load_data(file_path):
         st.error(f"La columna 'LONGITUD' no se encontró. Columnas disponibles: {list(df.columns)}")
         st.stop()
     
-    # 6. Identificar columnas de bovinos de forma segura para calcular el total acumulado
+    # 6. OPCIÓN A: Cargar directamente la columna nativa del CSV para evitar duplicidades
+    if 'TOTAL_ANIMALES_AFTOSA' in df.columns:
+        df['TOTAL_ANIMALES_AFTOSA'] = df['TOTAL_ANIMALES_AFTOSA'].astype(str).str.replace('.', '').str.replace(',', '.')
+        df['TOTAL_ANIMALES_AFTOSA'] = pd.to_numeric(df['TOTAL_ANIMALES_AFTOSA'], errors='coerce').fillna(0)
+    else:
+        st.error("No se encontró la columna oficial 'TOTAL_ANIMALES_AFTOSA' en el archivo CSV.")
+        st.stop()
+        
+    # Limpiar también las columnas individuales de bovinos para la pirámide (para que no tengan NaN)
     cols_bovinos = [
         c for c in df.columns 
         if 'AFTOSA_BOVINOS' in c 
         and not c.endswith('_AÑ_CONTROL') 
         and not c.endswith('_ANO_CONTROL')
-        and not c.endswith('_NV')  # Excluimos hembras/machos no vacunados
+        and not c.endswith('_NV')
         and not c.endswith('_N')
     ]
     df[cols_bovinos] = df[cols_bovinos].fillna(0)
-    
-    # Asignación de la variable calculada uniforme
-    df['TOTAL_ANIMALES_AFTOSA'] = df[cols_bovinos].sum(axis=1)
     
     # Filtrar coordenadas válidas
     df = df.dropna(subset=['LATITUD', 'LONGITUD'])
@@ -111,7 +116,7 @@ if df is not None:
     else:
         df_filtered = df
 
-    # 4. KPIs (INDICADORES CLAVE - TOTAL_ANIMALES_AFTOSA integrado)
+    # 4. KPIs (INDICADORES CLAVE - TOTAL_ANIMALES_AFTOSA oficial)
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Predios Filtrados", f"{len(df_filtered):,}")
     col2.metric("Población Bovina", f"{int(df_filtered['TOTAL_ANIMALES_AFTOSA'].sum()):,}")
@@ -286,7 +291,7 @@ if df is not None:
     with tab3:
         st.header("Vigilancia: Predios con Cero Bovinos")
         
-        # Filtramos predios registrados que registren exactamente 0 animales usando TOTAL_ANIMALES_AFTOSA
+        # Filtramos predios registrados que registren exactamente 0 animales usando TOTAL_ANIMALES_AFTOSA oficial
         df_error = df_filtered[df_filtered['TOTAL_ANIMALES_AFTOSA'] == 0]
         
         if not df_error.empty:
