@@ -62,17 +62,19 @@ def load_data(file_path):
         st.error(f"La columna 'LONGITUD' no se encontró. Columnas disponibles: {list(df.columns)}")
         st.stop()
     
-    # 6. Identificar columnas de bovinos de forma segura
+    # 6. Identificar columnas de bovinos de forma segura para calcular el total acumulado
     cols_bovinos = [
         c for c in df.columns 
         if 'AFTOSA_BOVINOS' in c 
         and not c.endswith('_AÑ_CONTROL') 
         and not c.endswith('_ANO_CONTROL')
-        and not c.endswith('_NV')  # Excluimos hembras/machos no vacunados de la población vacunada principal
+        and not c.endswith('_NV')  # Excluimos hembras/machos no vacunados
         and not c.endswith('_N')
     ]
     df[cols_bovinos] = df[cols_bovinos].fillna(0)
-    df['TOTAL_BOVINOS'] = df[cols_bovinos].sum(axis=1)
+    
+    # Reemplazo de la variable calculada en todo el flujo de datos
+    df['TOTAL_ANIMALES_AFTOSA'] = df[cols_bovinos].sum(axis=1)
     
     # Filtrar coordenadas válidas
     df = df.dropna(subset=['LATITUD', 'LONGITUD'])
@@ -109,11 +111,11 @@ if df is not None:
     else:
         df_filtered = df
 
-    # 4. KPIs (INDICADORES CLAVE)
+    # 4. KPIs (INDICADORES CLAVE - TOTAL_ANIMALES_AFTOSA integrado)
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Predios Filtrados", f"{len(df_filtered):,}")
-    col2.metric("Población Bovina", f"{int(df_filtered['TOTAL_BOVINOS'].sum()):,}")
-    promedio = df_filtered['TOTAL_BOVINOS'].mean() if len(df_filtered) > 0 else 0
+    col2.metric("Población Bovina", f"{int(df_filtered['TOTAL_ANIMALES_AFTOSA'].sum()):,}")
+    promedio = df_filtered['TOTAL_ANIMALES_AFTOSA'].mean() if len(df_filtered) > 0 else 0
     col3.metric("Promedio Animales/Predio", f"{promedio:.1f}")
 
     # 5. PESTAÑAS DE ANÁLISIS
@@ -133,8 +135,9 @@ if df is not None:
                 
             with col_map2:
                 st.subheader("Distribución por Tamaño del Hato")
+                # TOTAL_ANIMALES_AFTOSA define ahora el tamaño de la burbuja en el mapa de dispersión
                 fig_scatter = px.scatter_map(
-                    df_filtered, lat="LATITUD", lon="LONGITUD", color="MUNICIPIO", size="TOTAL_BOVINOS",
+                    df_filtered, lat="LATITUD", lon="LONGITUD", color="MUNICIPIO", size="TOTAL_ANIMALES_AFTOSA",
                     zoom=8, height=500
                 )
                 fig_scatter.update_layout(map_style="open-street-map")
@@ -146,7 +149,7 @@ if df is not None:
         st.header("Análisis de la Estructura del Hato Ganadero")
         st.subheader("1. Pirámide Poblacional Bovina (Edad y Sexo)")
         
-        # 1. Mapeo de columnas unificando las etiquetas a los 7 rangos deseados
+        # Mapeos de columnas
         mapa_hembras = {
             'AFTOSA_BOVINOS_HEMBRAS_MENORES_A_3_MESES': '0-3 meses',
             'AFTOSA_BOVINOS_HEMBRAS_MENORES_DE_3_A_8_MESES': '3-8 meses',
@@ -158,16 +161,15 @@ if df is not None:
         }
 
         mapa_machos = {
-            'AFTOSA_BOVINOS_MACHOS_MENORES_A_3_MESES': '0-3 meses',  # Homologado
-            'AFTOSA_BOVINOS_MACHOS_3_HASTA_8_MESES': '3-8 meses',    # Homologado
-            'AFTOSA_BOVINOS_MACHOS_8_HASTA_12_MESES': '8-12 meses',  # Homologado
-            'AFTOSA_BOVINOS_TERNEROS_MENORES_A_1_AÑ': '8-12 meses',  # Agrupado de forma lógica
+            'AFTOSA_BOVINOS_MACHOS_MENORES_A_3_MESES': '0-3 meses', 
+            'AFTOSA_BOVINOS_MACHOS_3_HASTA_8_MESES': '3-8 meses',
+            'AFTOSA_BOVINOS_MACHOS_8_HASTA_12_MESES': '8-12 meses',
+            'AFTOSA_BOVINOS_TERNEROS_MENORES_A_1_AÑ': '8-12 meses',
             'AFTOSA_BOVINOS_MACHOS_1___2_AÑO': '1-2 años',
             'AFTOSA_BOVINOS_MACHOS_2___3_AÑO': '2-3 años',
-            'AFTOSA_BOVINOS_MACHOS_MAYORES_A_3_AÑO': '3-5 años'      # Ajustado al rango disponible de machos
+            'AFTOSA_BOVINOS_MACHOS_MAYORES_A_3_AÑO': '3-5 años'
         }
 
-        # El orden estricto solicitado para la visualización de abajo hacia arriba en el eje Y
         orden_estricto = [
             '0-3 meses',
             '3-8 meses',
@@ -180,7 +182,6 @@ if df is not None:
 
         datos_edad, datos_sexo, datos_poblacion = [], [], []
 
-        # Extraer datos de Hembras
         for col_name, etiqueta in mapa_hembras.items():
             if col_name in df_filtered.columns:
                 total = df_filtered[col_name].sum()
@@ -188,7 +189,6 @@ if df is not None:
                 datos_sexo.append('Hembra')
                 datos_poblacion.append(total)
 
-        # Extraer datos de Machos
         for col_name, etiqueta in mapa_machos.items():
             if col_name in df_filtered.columns:
                 total = df_filtered[col_name].sum()
@@ -196,29 +196,24 @@ if df is not None:
                 datos_sexo.append('Macho')
                 datos_poblacion.append(total)
 
-        # Crear el DataFrame para graficar
         piramide_raw = pd.DataFrame({
             'Edad': datos_edad,
             'Sexo': datos_sexo,
             'Poblacion': datos_poblacion
         })
 
-        # Agrupar duplicados (por ejemplo, si '8-12 meses' sumó datos de terneros y de machos de 8-12)
         piramide_df = piramide_raw.groupby(['Edad', 'Sexo'], as_index=False)['Poblacion'].sum()
 
         if not piramide_df.empty and piramide_df['Poblacion'].sum() > 0:
-            # Forzar el orden categórico estricto especificado por el usuario
             categorias_existentes = [x for x in orden_estricto if x in piramide_df['Edad'].unique()]
             piramide_df['Edad'] = pd.Categorical(piramide_df['Edad'], categories=categorias_existentes, ordered=True)
             piramide_df = piramide_df.sort_values('Edad')
 
             piramide_df_plot = piramide_df.copy()
-            # Convertir los valores masculinos en negativos para el diseño reflejado (izquierda)
             piramide_df_plot.loc[piramide_df_plot['Sexo'] == 'Macho', 'Poblacion'] *= -1
             
             fig_piramide = go.Figure()
             
-            # Trazar Hembras (Derecha - Valores Positivos)
             df_h = piramide_df_plot[piramide_df_plot['Sexo'] == 'Hembra']
             fig_piramide.add_trace(go.Bar(
                 y=df_h['Edad'], x=df_h['Poblacion'],
@@ -226,7 +221,6 @@ if df is not None:
                 hovertemplate="Edad: %{y}<br>Hembras: %{x:,.0f}<extra></extra>"
             ))
             
-            # Trazar Machos (Izquierda - Valores Negativos representados en valor absoluto)
             df_m = piramide_df_plot[piramide_df_plot['Sexo'] == 'Macho']
             fig_piramide.add_trace(go.Bar(
                 y=df_m['Edad'], x=df_m['Poblacion'],
@@ -238,7 +232,6 @@ if df is not None:
             max_val = piramide_df_plot['Poblacion'].abs().max()
             if pd.isna(max_val) or max_val == 0: max_val = 100
 
-            # Ajustar etiquetas del eje X para que los valores de los machos (negativos) se vean positivos
             ticks_valores = list(range(int(-max_val), int(max_val), max(1, int(max_val // 5))))
             ticks_textos = [f"{abs(v):,}" for v in ticks_valores]
 
@@ -258,11 +251,25 @@ if df is not None:
             st.plotly_chart(fig_piramide, use_container_width=True)
         else:
             st.warning("No hay datos de población suficientes para estructurar la pirámide.")
-with tab3:
+            
+        st.markdown("---")
+        st.subheader("2. Distribución de Población Bovina por Municipio")
+        
+        if not df_filtered.empty:
+            # TOTAL_ANIMALES_AFTOSA define el total por municipio en la gráfica de barras
+            top_munis = df_filtered.groupby('MUNICIPIO')['TOTAL_ANIMALES_AFTOSA'].sum().sort_values(ascending=False).reset_index(name='Población Bovina') 
+            fig_bar = px.bar(
+                top_munis, x='Población Bovina', y='MUNICIPIO', orientation='h', 
+                color='Población Bovina', color_continuous_scale='Viridis'
+            )
+            fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}, height=600)
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+    with tab3:
         st.header("Vigilancia: Predios con Cero Bovinos")
         
-        # Filtramos predios que registren exactamente 0 animales sumando todas las columnas de aftosa
-        df_error = df_filtered[df_filtered['TOTAL_BOVINOS'] == 0]
+        # Filtramos predios registrados que registren exactamente 0 animales usando TOTAL_ANIMALES_AFTOSA
+        df_error = df_filtered[df_filtered['TOTAL_ANIMALES_AFTOSA'] == 0]
         
         if not df_error.empty:
             st.warning(f"🚨 Se encontraron {len(df_error)} predios registrados con 0 animales vacunados para Aftosa.")
@@ -270,18 +277,17 @@ with tab3:
             # Identificar dinámicamente el nombre de la columna de predio
             col_predio = 'PREDIO' if 'PREDIO' in df_error.columns else ('NOMBRE_PREDIO' if 'NOMBRE_PREDIO' in df_error.columns else df_error.columns[3])
             
-            # Crear el mapa interactivo configurando el hover (pasar el mouse por encima)
             fig_error = px.scatter_map(
                 df_error, 
                 lat="LATITUD", 
                 lon="LONGITUD", 
                 color_discrete_sequence=["red"],
-                hover_name=col_predio,  # Muestra el nombre del predio en negrita al pasar el mouse
+                hover_name=col_predio,
                 hover_data={
                     "MUNICIPIO": True, 
                     "VEREDA": True, 
                     "GANADERO": True,
-                    "LATITUD": False,   # Ocultamos coordenadas en el tooltip
+                    "LATITUD": False,
                     "LONGITUD": False
                 },
                 zoom=9, 
@@ -295,3 +301,9 @@ with tab3:
                 st.dataframe(df_error[['MUNICIPIO', 'VEREDA', 'GANADERO', col_predio]])
         else:
             st.success("No se detectaron predios con 0 bovinos vacunados en los datos de los municipios seleccionados.")
+
+    # Pie de página
+    st.markdown("---")
+    st.markdown("© 2025 Observatorio Epidemiológico - Desarrollado con Python y Streamlit")
+else:
+    st.warning("⚠️ La aplicación no puede continuar porque no se cargaron datos válidos.")
