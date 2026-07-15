@@ -63,7 +63,18 @@ def load_data(file_path):
         st.stop()
     
     # 6. OPCIÓN A: Cargar directamente la columna nativa del CSV para evitar duplicidades
-    if 'TOTAL_ANIMALES_AFTOSA' in df.columns
+    if 'TOTAL_ANIMALES_AFTOSA' in df.columns:  # <-- Asegúrate de que tenga los dos puntos (:) al final
+        # 1. Convertimos a string y quitamos espacios en blanco
+        df['TOTAL_ANIMALES_AFTOSA'] = df['TOTAL_ANIMALES_AFTOSA'].astype(str).str.strip()
+        
+        # 2. Si el número termina en ".0" o ".00", se lo quitamos antes de remover puntos
+        df['TOTAL_ANIMALES_AFTOSA'] = df['TOTAL_ANIMALES_AFTOSA'].str.replace(r'\.0+$', '', regex=True)
+        
+        # 3. Quitamos los puntos de miles (para que '5.61' pase a ser '561')
+        df['TOTAL_ANIMALES_AFTOSA'] = df['TOTAL_ANIMALES_AFTOSA'].str.replace('.', '', regex=False).str.replace(',', '', regex=False)
+        
+        # 4. Convertimos de manera segura a número entero
+        df['TOTAL_ANIMALES_AFTOSA'] = pd.to_numeric(df['TOTAL_ANIMALES_AFTOSA'], errors='coerce').fillna(0).astype(int)
     else:
         st.error("No se encontró la columna oficial 'TOTAL_ANIMALES_AFTOSA' en el archivo CSV.")
         st.stop()
