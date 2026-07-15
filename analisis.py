@@ -259,7 +259,7 @@ if df is not None:
         else:
             st.warning("No hay datos de población suficientes para estructurar la pirámide.")
 
-    with tab3:
+            with tab3:
         st.header("Vigilancia: Predios con Cero Bovinos")
         
         # Filtramos predios registrados que registren exactamente 0 animales sumando todas las columnas de aftosa
@@ -267,21 +267,32 @@ if df is not None:
         
         if not df_error.empty:
             st.warning(f"🚨 Se encontraron {len(df_error)} predios registrados con 0 animales vacunados para Aftosa.")
+            
+            # Identificar dinámicamente el nombre de la columna de predio
+            col_predio = 'PREDIO' if 'PREDIO' in df_error.columns else ('NOMBRE_PREDIO' if 'NOMBRE_PREDIO' in df_error.columns else df_error.columns[3])
+            
+            # Crear el mapa interactivo configurando el hover (pasar el mouse por encima)
             fig_error = px.scatter_map(
-                df_error, lat="LATITUD", lon="LONGITUD", color_discrete_sequence=["red"],
-                zoom=9, height=500, title="Ubicación de Registros Anómalos (0 Animales)"
+                df_error, 
+                lat="LATITUD", 
+                lon="LONGITUD", 
+                color_discrete_sequence=["red"],
+                hover_name=col_predio,  # <-- Muestra el nombre del predio en negrita al pasar el mouse
+                hover_data={
+                    "MUNICIPIO": True, 
+                    "VEREDA": True, 
+                    "GANADERO": True,
+                    "LATITUD": False,   # Ocultamos coordenadas en el tooltip para no saturar de texto
+                    "LONGITUD": False
+                },
+                zoom=9, 
+                height=500, 
+                title="Ubicación de Registros Anómalos (0 Animales)"
             )
             fig_error.update_layout(map_style="open-street-map")
             st.plotly_chart(fig_error, use_container_width=True)
             
             with st.expander("Ver tabla de datos anómalos"):
-                col_predio = 'PREDIO' if 'PREDIO' in df_error.columns else ('NOMBRE_PREDIO' if 'NOMBRE_PREDIO' in df_error.columns else df_error.columns[3])
                 st.dataframe(df_error[['MUNICIPIO', 'VEREDA', 'GANADERO', col_predio]])
         else:
             st.success("No se detectaron predios con 0 bovinos vacunados en los datos de los municipios seleccionados.")
-
-    # Pie de página
-    st.markdown("---")
-    st.markdown("© 2025 Observatorio Epidemiológico - Desarrollado con Python y Streamlit")
-else:
-    st.warning("⚠️ La aplicación no puede continuar porque no se cargaron datos válidos.")
