@@ -146,7 +146,7 @@ if df is not None:
         st.header("Análisis de la Estructura del Hato Ganadero")
         st.subheader("1. Pirámide Poblacional Bovina (Edad y Sexo)")
         
-        # Mapeos que ahora coinciden perfectamente gracias a la normalización de la "Ñ"
+        # 1. Mapeo de columnas unificando las etiquetas a los 7 rangos deseados
         mapa_hembras = {
             'AFTOSA_BOVINOS_HEMBRAS_MENORES_A_3_MESES': '0-3 meses',
             'AFTOSA_BOVINOS_HEMBRAS_MENORES_DE_3_A_8_MESES': '3-8 meses',
@@ -158,27 +158,29 @@ if df is not None:
         }
 
         mapa_machos = {
-            'AFTOSA_BOVINOS_MACHOS_MENORES_A_3_MESES': '< 3 meses', 
-            'AFTOSA_BOVINOS_MACHOS_3_HASTA_8_MESES': '3-8 meses',
-            'AFTOSA_BOVINOS_MACHOS_8_HASTA_12_MESES': '8-12 meses',
-            'AFTOSA_BOVINOS_TERNEROS_MENORES_A_1_AÑ': 'Terneros < 1 año',
+            'AFTOSA_BOVINOS_MACHOS_MENORES_A_3_MESES': '0-3 meses',  # Homologado
+            'AFTOSA_BOVINOS_MACHOS_3_HASTA_8_MESES': '3-8 meses',    # Homologado
+            'AFTOSA_BOVINOS_MACHOS_8_HASTA_12_MESES': '8-12 meses',  # Homologado
+            'AFTOSA_BOVINOS_TERNEROS_MENORES_A_1_AÑ': '8-12 meses',  # Agrupado de forma lógica
             'AFTOSA_BOVINOS_MACHOS_1___2_AÑO': '1-2 años',
             'AFTOSA_BOVINOS_MACHOS_2___3_AÑO': '2-3 años',
-            'AFTOSA_BOVINOS_MACHOS_MAYORES_A_3_AÑO': '> 3 años'
+            'AFTOSA_BOVINOS_MACHOS_MAYORES_A_3_AÑO': '3-5 años'      # Ajustado al rango disponible de machos
         }
 
-        orden_cronologico = [
-            '0-3 meses', '< 3 meses',
+        # El orden estricto solicitado para la visualización de abajo hacia arriba en el eje Y
+        orden_estricto = [
+            '0-3 meses',
             '3-8 meses',
-            '8-12 meses', 'Terneros < 1 año',
+            '8-12 meses',
             '1-2 años',
             '2-3 años',
-            '3-5 años', '> 3 años',
+            '3-5 años',
             '> 5 años'
         ]
 
         datos_edad, datos_sexo, datos_poblacion = [], [], []
 
+        # Extraer datos de Hembras
         for col_name, etiqueta in mapa_hembras.items():
             if col_name in df_filtered.columns:
                 total = df_filtered[col_name].sum()
@@ -186,6 +188,7 @@ if df is not None:
                 datos_sexo.append('Hembra')
                 datos_poblacion.append(total)
 
+        # Extraer datos de Machos
         for col_name, etiqueta in mapa_machos.items():
             if col_name in df_filtered.columns:
                 total = df_filtered[col_name].sum()
@@ -193,63 +196,68 @@ if df is not None:
                 datos_sexo.append('Macho')
                 datos_poblacion.append(total)
 
-        piramide_df = pd.DataFrame({
+        # Crear el DataFrame para graficar
+        piramide_raw = pd.DataFrame({
             'Edad': datos_edad,
             'Sexo': datos_sexo,
             'Poblacion': datos_poblacion
         })
 
+        # Agrupar duplicados (por ejemplo, si '8-12 meses' sumó datos de terneros y de machos de 8-12)
+        piramide_df = piramide_raw.groupby(['Edad', 'Sexo'], as_index=False)['Poblacion'].sum()
+
         if not piramide_df.empty and piramide_df['Poblacion'].sum() > 0:
-            categorias_existentes = [x for x in orden_cronologico if x in piramide_df['Edad'].unique()]
+            # Forzar el orden categórico estricto especificado por el usuario
+            categorias_existentes = [x for x in orden_estricto if x in piramide_df['Edad'].unique()]
             piramide_df['Edad'] = pd.Categorical(piramide_df['Edad'], categories=categorias_existentes, ordered=True)
             piramide_df = piramide_df.sort_values('Edad')
 
             piramide_df_plot = piramide_df.copy()
-            # Convertir los valores masculinos en negativos para el diseño de la pirámide
+            # Convertir los valores masculinos en negativos para el diseño reflejado (izquierda)
             piramide_df_plot.loc[piramide_df_plot['Sexo'] == 'Macho', 'Poblacion'] *= -1
             
             fig_piramide = go.Figure()
             
-            # Trazar Hembras
+            # Trazar Hembras (Derecha - Valores Positivos)
             df_h = piramide_df_plot[piramide_df_plot['Sexo'] == 'Hembra']
             fig_piramide.add_trace(go.Bar(
                 y=df_h['Edad'], x=df_h['Poblacion'],
-                orientation='h', name='Hembras', marker_color='#E91E63'
+                orientation='h', name='Hembras', marker_color='#E91E63',
+                hovertemplate="Edad: %{y}<br>Hembras: %{x:,.0f}<extra></extra>"
             ))
             
-            # Trazar Machos
+            # Trazar Machos (Izquierda - Valores Negativos representados en valor absoluto)
             df_m = piramide_df_plot[piramide_df_plot['Sexo'] == 'Macho']
             fig_piramide.add_trace(go.Bar(
                 y=df_m['Edad'], x=df_m['Poblacion'],
-                orientation='h', name='Machos', marker_color='#2196F3'
+                orientation='h', name='Machos', marker_color='#2196F3',
+                hovertemplate="Edad: %{y}<br>Machos: %{customdata:,.0f}<extra></extra>",
+                customdata=df_m['Poblacion'].abs()
             ))
             
             max_val = piramide_df_plot['Poblacion'].abs().max()
             if pd.isna(max_val) or max_val == 0: max_val = 100
 
+            # Ajustar etiquetas del eje X para que los valores de los machos (negativos) se vean positivos
+            ticks_valores = list(range(int(-max_val), int(max_val), max(1, int(max_val // 5))))
+            ticks_textos = [f"{abs(v):,}" for v in ticks_valores]
+
             fig_piramide.update_layout(
-                title='Pirámide de Edad y Sexo (Bovinos Vacunados)',
+                title='Pirámide Poblacional de Edad y Sexo (Ciclo II 2025)',
                 barmode='relative',
-                xaxis=dict(title='Población', range=[-max_val*1.1, max_val*1.1]),
-                yaxis=dict(type='category'),
+                xaxis=dict(
+                    title='Número de Animales',
+                    tickvals=ticks_valores,
+                    ticktext=ticks_textos,
+                    range=[-max_val * 1.1, max_val * 1.1]
+                ),
+                yaxis=dict(type='category', title='Rango de Edad'),
                 height=600,
                 bargap=0.1
             )
             st.plotly_chart(fig_piramide, use_container_width=True)
         else:
-            st.warning("No hay datos de población suficientes para estructurar la pirámide. Verifica las columnas de población en tu CSV.")
-            
-        st.markdown("---")
-        st.subheader("2. Distribución de Población Bovina por Municipio")
-        
-        if not df_filtered.empty:
-            top_munis = df_filtered.groupby('MUNICIPIO')['TOTAL_BOVINOS'].sum().sort_values(ascending=False).reset_index(name='Población Bovina') 
-            fig_bar = px.bar(
-                top_munis, x='Población Bovina', y='MUNICIPIO', orientation='h', 
-                color='Población Bovina', color_continuous_scale='Viridis'
-            )
-            fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}, height=600)
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.warning("No hay datos de población suficientes para estructurar la pirámide.")
 
     with tab3:
         st.header("Vigilancia: Predios con Cero Bovinos")
