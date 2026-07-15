@@ -258,11 +258,10 @@ if df is not None:
             st.plotly_chart(fig_piramide, use_container_width=True)
         else:
             st.warning("No hay datos de población suficientes para estructurar la pirámide.")
-
-            with tab3:
+with tab3:
         st.header("Vigilancia: Predios con Cero Bovinos")
         
-        # Filtramos predios registrados que registren exactamente 0 animales sumando todas las columnas de aftosa
+        # Filtramos predios que registren exactamente 0 animales sumando todas las columnas de aftosa
         df_error = df_filtered[df_filtered['TOTAL_BOVINOS'] == 0]
         
         if not df_error.empty:
@@ -277,12 +276,12 @@ if df is not None:
                 lat="LATITUD", 
                 lon="LONGITUD", 
                 color_discrete_sequence=["red"],
-                hover_name=col_predio,  # <-- Muestra el nombre del predio en negrita al pasar el mouse
+                hover_name=col_predio,  # Muestra el nombre del predio en negrita al pasar el mouse
                 hover_data={
                     "MUNICIPIO": True, 
                     "VEREDA": True, 
                     "GANADERO": True,
-                    "LATITUD": False,   # Ocultamos coordenadas en el tooltip para no saturar de texto
+                    "LATITUD": False,   # Ocultamos coordenadas en el tooltip
                     "LONGITUD": False
                 },
                 zoom=9, 
