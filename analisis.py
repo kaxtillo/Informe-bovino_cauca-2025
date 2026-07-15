@@ -133,12 +133,30 @@ if df is not None:
                 HeatMap(heat_data, radius=10).add_to(m)
                 st_folium(m, height=500, use_container_width=True)
                 
-            with col_map2:
+           with col_map2:
                 st.subheader("Distribución por Tamaño del Hato")
-                # TOTAL_ANIMALES_AFTOSA define ahora el tamaño de la burbuja en el mapa de dispersión
+                
+                # Identificar dinámicamente el nombre de la columna de predio
+                col_predio = 'PREDIO' if 'PREDIO' in df_filtered.columns else ('NOMBRE_PREDIO' if 'NOMBRE_PREDIO' in df_filtered.columns else df_filtered.columns[3])
+                
+                # Configurar el mapa de dispersión para mostrar el predio en el hover
                 fig_scatter = px.scatter_map(
-                    df_filtered, lat="LATITUD", lon="LONGITUD", color="MUNICIPIO", size="TOTAL_ANIMALES_AFTOSA",
-                    zoom=8, height=500
+                    df_filtered, 
+                    lat="LATITUD", 
+                    lon="LONGITUD", 
+                    color="MUNICIPIO", 
+                    size="TOTAL_ANIMALES_AFTOSA",
+                    hover_name=col_predio,  # <-- Muestra el nombre del predio en negrita al pasar el mouse
+                    hover_data={
+                        "MUNICIPIO": True,
+                        "VEREDA": True,
+                        "GANADERO": True,
+                        "TOTAL_ANIMALES_AFTOSA": ":,.0f",  # Muestra el total formateado con miles
+                        "LATITUD": False,                  # Ocultamos coordenadas para evitar ruido visual
+                        "LONGITUD": False
+                    },
+                    zoom=8, 
+                    height=500
                 )
                 fig_scatter.update_layout(map_style="open-street-map")
                 st.plotly_chart(fig_scatter, use_container_width=True)
